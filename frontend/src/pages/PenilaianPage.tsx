@@ -239,7 +239,7 @@ export default function PenilaianPage() {
               <input
                 value={form.nama}
                 onChange={(e) => updateField("nama", e.target.value)}
-                placeholder="Contoh: Ahmad Fauzi"
+                placeholder="Nama Lengkap"
               />
             </label>
 

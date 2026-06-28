@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import Badge from "../components/Badge";
-import Layout from "../components/Layout";
-import { api } from "../services/api";
-import { Criteria, RankingResult, TopsisResponse } from "../types";
-import { formatNumber } from "../utils/format";
+import Badge from "../components/Badge.js";
+import Layout from "../components/Layout.js";
+import { api } from "../services/api.js";
+import { Criteria, RankingResult, TopsisResponse } from "../types.js";
+import { formatNumber } from "../utils/format.js";
 
 export default function PerhitunganPage() {
   const [data, setData] = useState<TopsisResponse | null>(null);

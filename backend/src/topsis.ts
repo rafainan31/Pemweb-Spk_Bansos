@@ -141,8 +141,10 @@ export function calculateTOPSIS(
     const type = String(criterion.type).toLowerCase();
     const values = weightedRaw.map((row) => row.values[code]);
 
-    if (type === "benefit") {
-      idealPositiveRaw[code] = Math.max(...values);
+    // MODIFIKASI DI SINI: Paksa C1, C2, dan C5 ikut logika Benefit 
+    // karena skor data mentahnya sudah dibalik (Skor 5 = Paling Berhak)
+    if (type === "benefit" || code === "C1" || code === "C2" || code === "C5") {
+      idealPositiveRaw[code] = Math.max(...values); // Solusi Ideal Positif mencari nilai terbesar (Skor 5)
       idealNegativeRaw[code] = Math.min(...values);
     } else {
       idealPositiveRaw[code] = Math.min(...values);

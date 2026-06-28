@@ -5,6 +5,7 @@ import { pool, testConnection } from "./db";
 import { calculateTOPSIS } from "./topsis";
 import { Criteria } from "./types";
 
+
 dotenv.config();
 
 const app = express();
