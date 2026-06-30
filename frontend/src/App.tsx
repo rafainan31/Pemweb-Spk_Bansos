@@ -11,6 +11,7 @@ import PerhitunganPage from "./pages/PerhitunganPage";
 import RankingPage from "./pages/RankingPage";
 import WargaPage from "./pages/WargaPage";
 import CekDataPage from "./pages/CekDataPage";
+import PerbandinganPage from "./pages/PerbandinganPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const isLogin = localStorage.getItem("bansos-auth") === "true";
@@ -86,6 +87,15 @@ export default function App() {
         element={
           <ProtectedRoute>
             <LaporanPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/perbandingan"
+        element={
+          <ProtectedRoute>
+            <PerbandinganPage/>
           </ProtectedRoute>
         }
       />

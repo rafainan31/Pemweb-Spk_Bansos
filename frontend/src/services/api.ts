@@ -71,6 +71,16 @@ export type CekDataResponse = {
   } | null;
 };
 
+export interface MetodeResult {
+  id: number;
+  code: string;
+  nama: string;
+  ranking: number;
+  nilaiSAW?: number;
+  nilaiWP?: number;
+  preference?: number;
+}
+
 export const api = {
   health: () => request<{ message: string }>("/health"),
 
@@ -105,6 +115,12 @@ export const api = {
     request<{ message: string }>(`/warga/${id}`, {
       method: "DELETE",
     }),
+
+  getSAW: () =>
+    request<MetodeResult[]>("/saw"),
+
+  getWP: () =>
+    request<MetodeResult[]>("/wp"),
 
   getTopsis: () => request<TopsisResponse>("/topsis"),
 

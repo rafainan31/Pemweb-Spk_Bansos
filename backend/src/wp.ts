@@ -1,44 +1,179 @@
 import { Criteria, WargaDTO } from "./types";
 
-export function calculateWP(wargaList: WargaDTO[], criteriaInput: Criteria[]) {
-  const codes = criteriaInput.map((item) => item.code);
 
-  // 1. Normalisasi Bobot Kriteria (Pangkat positif karena sudah dibalik jadi Benefit semua)
-  const weightSum = criteriaInput.reduce((sum, c) => sum + Number(c.weight), 0) || 1;
-  const normalizedWeights: Record<string, number> = {};
-  criteriaInput.forEach((c) => {
-    normalizedWeights[c.code] = Number(c.weight) / weightSum;
+
+export function calculateWP(
+  wargaList: WargaDTO[],
+  criteria: Criteria[]
+){
+
+
+  const data = wargaList.filter(
+    item => item.status === "Sudah Dinilai"
+  );
+
+
+  if(data.length === 0){
+    return [];
+  }
+
+
+
+  // total bobot
+
+  const totalBobot =
+    criteria.reduce(
+      (sum,c)=>
+      sum + Number(c.weight),
+      0
+    );
+
+
+
+
+  // normalisasi bobot + cost negatif
+
+  const bobotNormal:any = {};
+
+
+
+  criteria.forEach(c=>{
+
+
+    let weight =
+    Number(c.weight)
+    /
+    totalBobot;
+
+
+
+    if(c.type === "cost"){
+
+      weight =
+      weight * -1;
+
+    }
+
+
+    bobotNormal[c.code]=weight;
+
+
   });
 
-  // 2. Hitung Vektor S
-  let totalVectorS = 0;
-  const initialResults = wargaList.map((row) => {
-    let vectorS = 1;
 
-    codes.forEach((code) => {
-      const currentScore = Number(row.scores?.[code] || 1);
-      vectorS *= Math.pow(currentScore, normalizedWeights[code]); // Rumus WP S_i
+
+
+
+
+
+  // hitung S
+
+  const nilaiS = data.map(warga=>{
+
+
+    let S = 1;
+
+
+
+    criteria.forEach(c=>{
+
+
+      const nilai =
+      Number(
+        warga.scores[c.code] || 1
+      );
+
+
+
+      S *= Math.pow(
+        nilai,
+        bobotNormal[c.code]
+      );
+
+
     });
 
-    totalVectorS += vectorS;
-    return { ...row, vectorS };
-  });
 
-  // 3. Hitung Vektor V (Preferensi Akhir)
-  const results = initialResults.map((row) => {
-    const preference = totalVectorS === 0 ? 0 : row.vectorS / totalVectorS;
+
 
     return {
-      nik: row.nik,
-      nama: row.nama,
-      alamat: row.alamat,
-      preference: Number(preference.toFixed(4)),
-      rank: 0
+
+      id:warga.id,
+
+      code:warga.code,
+
+      nama:warga.nama,
+
+      S
+
     };
+
+
   });
 
-  // 4. Perangkingan
-  return results
-    .sort((a, b) => b.preference - a.preference)
-    .map((row, index) => ({ ...row, rank: index + 1 }));
+
+
+
+
+  const totalS =
+    nilaiS.reduce(
+      (sum,item)=>
+      sum + item.S,
+      0
+    );
+
+
+
+
+
+
+  // hitung nilai V
+
+
+  return nilaiS
+
+
+  .map(item=>{
+
+
+    return {
+
+      id:item.id,
+
+      code:item.code,
+
+      nama:item.nama,
+
+
+      nilaiWP:
+      Number(
+        (item.S / totalS)
+        .toFixed(4)
+      )
+
+
+    };
+
+
+  })
+
+
+
+  .sort(
+    (a,b)=>
+    b.nilaiWP-a.nilaiWP
+  )
+
+
+
+  .map(
+    (item,index)=>({
+
+      ...item,
+
+      ranking:index+1
+
+    })
+  );
+
 }

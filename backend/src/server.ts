@@ -2,8 +2,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import { pool, testConnection } from "./db";
-import { calculateTOPSIS } from "./topsis";
 import { Criteria } from "./types";
+import { calculateTOPSIS } from "./topsis";
+import { calculateSAW } from "./saw";
+import { calculateWP } from "./wp";
 
 
 dotenv.config();
@@ -282,6 +284,7 @@ async function getWargaList(): Promise<WargaItem[]> {
   });
 }
 
+
 async function saveTopsisResult(topsis: any) {
   const requestId = await ensureDefaultRequest();
 
@@ -311,6 +314,65 @@ async function saveTopsisResult(topsis: any) {
       item.id,
     ]);
   }
+}
+
+async function savePerbandingan(
+  data: any[],
+  metode: string
+) {
+
+
+  const requestId =
+    await ensureDefaultRequest();
+
+
+
+  for (const item of data) {
+
+
+    await pool.query(
+
+      `
+INSERT INTO perbandingan_metode
+
+(
+id_request,
+id_warga,
+metode,
+nilai,
+ranking,
+status_kelayakan
+)
+
+VALUES (?,?,?,?,?,?)
+
+`,
+
+      [
+
+        requestId,
+
+        item.id,
+
+        metode,
+
+        item.preference,
+
+        item.rank,
+
+        item.status
+
+      ]
+
+
+    );
+
+
+
+  }
+
+
+
 }
 
 app.get("/api/health", async (_req, res) => {
@@ -510,12 +572,12 @@ app.post("/api/cek-data", async (req, res) => {
       status: ranking?.status || found.statusKelayakan || "Belum Dihitung",
       ranking: ranking
         ? {
-            preference: ranking.preference,
-            rank: ranking.rank,
-            status: ranking.status,
-            dPlus: ranking.dPlus,
-            dMinus: ranking.dMinus,
-          }
+          preference: ranking.preference,
+          rank: ranking.rank,
+          status: ranking.status,
+          dPlus: ranking.dPlus,
+          dMinus: ranking.dMinus,
+        }
         : null,
     });
   } catch (error) {
@@ -660,9 +722,17 @@ app.get("/api/topsis", async (_req, res) => {
       createdAt: w.createdAt ? new Date(w.createdAt) : undefined,
     }));
 
-    const topsis = calculateTOPSIS(wargaDTO, criteria);
+    const topsis =
+      calculateTOPSIS(
+        wargaDTO,
+        criteria
+      );
 
-    await saveTopsisResult(topsis);
+
+    await savePerbandingan(
+      topsis.results,
+      "TOPSIS"
+    );
 
     res.json({
       criteria,
@@ -710,6 +780,116 @@ app.get("/api/summary", async (_req, res) => {
       error: String(error),
     });
   }
+});
+
+app.get("/api/saw",async(req,res)=>{
+
+try{
+
+
+const [
+criteria,
+warga
+
+]=await Promise.all([
+
+getCriteria(),
+
+getWargaList()
+
+]);
+
+
+
+const hasil =
+calculateSAW(
+warga,
+criteria
+);
+
+
+
+await savePerbandingan(
+hasil,
+"SAW"
+);
+
+
+
+res.json(hasil);
+
+
+
+}catch(error){
+
+
+res.status(500).json({
+
+message:"Gagal menghitung SAW",
+
+error:String(error)
+
+});
+
+
+}
+
+
+});
+
+app.get("/api/wp",async(req,res)=>{
+
+try{
+
+
+const [
+criteria,
+warga
+
+]=await Promise.all([
+
+getCriteria(),
+
+getWargaList()
+
+]);
+
+
+
+const hasil =
+calculateWP(
+warga,
+criteria
+);
+
+
+
+await savePerbandingan(
+hasil,
+"WP"
+);
+
+
+
+res.json(hasil);
+
+
+
+}catch(error){
+
+
+res.status(500).json({
+
+message:"Gagal menghitung WP",
+
+error:String(error)
+
+});
+
+
+}
+
+
 });
 
 app.listen(PORT, () => {
