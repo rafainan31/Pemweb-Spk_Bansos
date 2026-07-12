@@ -102,7 +102,6 @@ export default function PenilaianPage() {
     try {
       setLoadingOptions(true);
       const data = await api.getOptions();
-
       setOptionsData({
         ...emptyOptions,
         ...data,
@@ -180,7 +179,27 @@ export default function PenilaianPage() {
     try {
       setSaving(true);
 
-      const result = await api.savePenilaian(form);
+      // 1. Ambil session petugas aktif dari localStorage
+      const userSession = localStorage.getItem("user_session");
+      let loggedInUserId: number | undefined = undefined;
+
+      if (userSession) {
+        try {
+          const parsedUser = JSON.parse(userSession);
+          loggedInUserId = parsedUser.id || parsedUser.user?.id;
+        } catch (e) {
+          console.error("Gagal membaca session user:", e);
+        }
+      }
+
+      // 2. Gabungkan data form dengan userId petugas pendukung keputusan
+      const payloadToSend = {
+        ...form,
+        userId: loggedInUserId
+      };
+
+      // PERBAIKAN UTAMA: Sekarang menembak dengan objek gabungan utuh, bukan data form kosongan lagi!
+      const result = await api.savePenilaian(payloadToSend);
 
       setMessage(`${result.message}. Kode alternatif: ${result.code}.`);
       setForm(initialForm);
@@ -207,15 +226,12 @@ export default function PenilaianPage() {
         <div className="hero-panel compact">
           <div>
             <span className="eyebrow">Input Alternatif</span>
-
             <h2>Data warga akan otomatis menjadi alternatif TOPSIS.</h2>
-
             <p>
               Pilihan kriteria diambil langsung dari database, lalu dikonversi
               menjadi skor untuk proses perhitungan TOPSIS.
             </p>
           </div>
-
           <div className="hero-metric">
             <b>6</b>
             <span>Kriteria Aktif</span>
@@ -272,7 +288,6 @@ export default function PenilaianPage() {
                 1 sampai 5.
               </p>
             </div>
-
             <button type="button" className="btn light" onClick={loadOptions}>
               Refresh Opsi
             </button>
@@ -302,7 +317,6 @@ export default function PenilaianPage() {
             Semakin besar skor, semakin tidak diprioritaskan. Digunakan untuk
             pendapatan, daya listrik, dan kendaraan.
           </div>
-
           <div className="info-box no-margin success-box">
             <b>Benefit</b>
             <br />
@@ -317,11 +331,10 @@ export default function PenilaianPage() {
           <button type="button" className="btn outline" onClick={resetForm}>
             Reset
           </button>
-
           <button type="submit" className="btn primary" disabled={saving}>
             {saving ? "Menyimpan..." : "Simpan Penilaian"}
           </button>
-
+          {/* UBAH HURUF DEPANNYA MENJADI KAPITAL 'Link' */}
           <Link to="/perhitungan" className="btn success">
             Proses TOPSIS
           </Link>
@@ -346,19 +359,16 @@ function SelectField({ field, value, options, onChange }: SelectFieldProps) {
     <label className="criteria-select-card">
       <div className="criteria-select-head">
         <span className="kode-badge">{meta.code}</span>
-
         <span className={`badge ${meta.type === "benefit" ? "success" : "warning"}`}>
           {meta.type.toUpperCase()}
         </span>
       </div>
 
       <span className="criteria-label">{meta.name}</span>
-
       <small>{meta.description}</small>
 
       <select value={value} onChange={(e) => onChange(field, e.target.value)}>
         <option value="">Pilih {meta.name.toLowerCase()}</option>
-
         {options.map((item) => (
           <option key={item.label} value={item.label}>
             {item.label} — Skor {item.score ?? item.value}

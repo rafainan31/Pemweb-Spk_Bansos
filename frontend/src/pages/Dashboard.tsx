@@ -1,105 +1,106 @@
 import { CSSProperties, useEffect, useMemo, useState } from "react";
-import Badge from "../components/Badge";
 import Layout from "../components/Layout";
 import StatCard from "../components/StatCard";
 import { api } from "../services/api";
-import { SummaryResponse } from "../types";
 import { formatNumber } from "../utils/format";
 
-const initialSummary: SummaryResponse = {
-  totalWarga: 0,
-  sudahDinilai: 0,
-  sangatLayak: 0,
-  layak: 0,
-  dipertimbangkan: 0,
-  tidakLayak: 0,
-  prioritas: []
-};
+// Interface ini SESUAI dengan kolom di rekomendasi_result
+interface AlternatifResult {
+  id: number;
+  nama: string;
+  code: string;
+  nilai_saw: number;
+  nilai_wp: number;
+  nilai_topsis: number;
+  ranking: number;
+}
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState<SummaryResponse>(initialSummary);
+  const [prioritas, setPrioritas] = useState<AlternatifResult[]>([]);
+  const [totalWarga, setTotalWarga] = useState(0);
+  const [sudahDinilai, setSudahDinilai] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getSummary()
-      .then(setSummary)
-      .catch(() => setSummary(initialSummary))
+    // PERBAIKAN UTAMA: Paksa return type getSummary menjadi 'any' lewat Type Casting
+    (api.getSummary() as Promise<any>)
+      .then((summaryData) => {
+        setTotalWarga(summaryData.totalWarga || 0);
+        setSudahDinilai(summaryData.sudahDinilai || 0);
+
+        // Transformasi data agar sesuai dengan AlternatifResult
+        const mappedData: AlternatifResult[] = (summaryData.prioritas || []).map((item: any) => ({
+          id: Number(item.id),
+          code: item.code || `A${item.id}`,
+          nama: item.nama || "Tanpa Nama",
+          nilai_saw: Number(item.nilai_saw) || 0,
+          nilai_wp: Number(item.nilai_wp) || 0,
+          nilai_topsis: Number(item.nilai_topsis) || 0,
+          ranking: Number(item.ranking) || 0
+        }));
+
+        setPrioritas(mappedData);
+      })
+      .catch((err) => {
+        console.error("Gagal ambil data:", err);
+        setPrioritas([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const totalResult = summary.sangatLayak + summary.layak + summary.dipertimbangkan + summary.tidakLayak;
-  const layakTotal = summary.sangatLayak + summary.layak;
-  const percent = totalResult ? Math.round((layakTotal / totalResult) * 100) : 0;
-  const donutStyle = { '--percent': percent } as CSSProperties;
+  const percentNilaiTinggi = useMemo(() => {
+    // Tambahkan pengecekan keamanan
+    if (!prioritas || !Array.isArray(prioritas) || prioritas.length === 0) return 0;
 
-  const bars = useMemo(() => {
-    const data = [
-      { label: 'Sangat Layak', value: summary.sangatLayak },
-      { label: 'Layak', value: summary.layak },
-      { label: 'Dipertimbangkan', value: summary.dipertimbangkan },
-      { label: 'Tidak Layak', value: summary.tidakLayak }
-    ];
-    const max = Math.max(...data.map((item) => item.value), 1);
-    return data.map((item) => ({ ...item, height: Math.max(42, Math.round((item.value / max) * 210)) }));
-  }, [summary]);
+    const diAtasAmbang = prioritas.filter(item => item && item.nilai_topsis >= 0.5).length;
+    return Math.round((diAtasAmbang / prioritas.length) * 100);
+  }, [prioritas]);
 
   return (
-    <Layout title="Dashboard" subtitle="Ringkasan SPK penerima bansos berdasarkan kriteria C1-C6 dan metode TOPSIS.">
+    <Layout title="Dashboard" subtitle="Ringkasan parameter kuantitatif multi-metode pendukung keputusan.">
       {loading && <div className="info-box">Mengambil data dari MariaDB...</div>}
 
-      <div className="hero-panel">
-        <div>
-          <span className="eyebrow">Sistem Pendukung Keputusan</span>
-          <h2>Kelayakan Bantuan Sosial</h2>
-          <p>Ranking otomatis dihitung dari pendapatan, daya listrik, kondisi rumah, kendaraan, dan komponen PKH.</p>
-        </div>
-        <div className="hero-metric"><b>{percent}%</b><span>Layak dari data dinilai</span></div>
+      <div className="hero-metric">
+        <b>{percentNilaiTinggi}%</b>
+        <span>Skor Topsis &gt;= 0.5</span>
       </div>
+
+      <p className="text-xs font-semibold text-slate-500 mt-2 text-center leading-relaxed">
+        Persentase jumlah total alternatif yang menembus nilai preferensi ideal (&gt;= 0.5) dalam kalkulasi normalisasi matriks keputusan.
+      </p>
 
       <div className="stats-grid">
-        <StatCard icon="◉" label="Total Warga" value={summary.totalWarga} note="Orang" />
-        <StatCard icon="✓" label="Sudah Dinilai" value={summary.sudahDinilai} note="Data tersimpan" />
-        <StatCard icon="▲" label="Lolos Kelayakan" value={layakTotal} note="Sangat layak + layak" color="green" />
-        <StatCard icon="!" label="Tidak Lolos" value={summary.tidakLayak} note="Tidak layak" color="red" />
+        <StatCard icon="◉" label="Total Warga" value={totalWarga} note="Jiwa" />
+        <StatCard icon="✓" label="Dievaluasi" value={sudahDinilai} note="Data" />
+        {/* KONSENSUS: Hanya filter berdasarkan TOPSIS >= 0.5 agar sinkron dengan persentase di atas */}
+        <StatCard icon="▲" label="Konsensus" value={prioritas.filter(x => x.nilai_topsis >= 0.5).length} note="Skor Tinggi" color="green" />
+        {/* RENDAH: Ubah filter menjadi < 0.5 dan note menjadi "< 0.5" agar data yang bernilai 0.37 masuk ke sini */}
+        <StatCard icon="!" label="Rendah" value={prioritas.filter(x => x.nilai_topsis < 0.5).length} note="< 0.5" color="red" />
       </div>
 
-      <div className="dashboard-grid">
-        <div className="card">
-          <h3>Distribusi Status Kelayakan</h3>
-          <div className="bar-chart">
-            {bars.map((bar) => (
-              <div key={bar.label} style={{ height: `${bar.height}px` }}><b>{bar.value}</b><span>{bar.label}</span></div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card center-card">
-          <h3>Persentase Kelayakan</h3>
-          <div className="donut" style={donutStyle}><span>{percent}%</span></div>
-          <p><Badge variant="success">Layak</Badge> {layakTotal} data</p>
-          <p><Badge variant="danger">Tidak Layak</Badge> {summary.tidakLayak} data</p>
-        </div>
-      </div>
-
-      <div className="card table-card premium-table">
-        <div className="card-head">
-          <h3>Penerima Prioritas</h3>
-          <a className="btn outline" href="/ranking">Lihat Semua</a>
-        </div>
-        <table>
-          <thead><tr><th>Ranking</th><th>Kode</th><th>Nama</th><th>Nilai Preferensi</th><th>Status</th></tr></thead>
+      <div className="overflow-hidden rounded-[24px] border border-slate-200/60 bg-white p-6 shadow-xl shadow-slate-100/40">
+        <h3 className="mb-4">Penerima Prioritas Utama</h3>
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-xs uppercase text-slate-400">
+              <th>No</th><th>Kode</th><th>Nama</th><th>SAW</th><th>WP</th><th>TOPSIS</th>
+            </tr>
+          </thead>
           <tbody>
-            {summary.prioritas.length === 0 ? (
-              <tr><td colSpan={5}>Belum ada data penilaian. Input data di halaman Penilaian.</td></tr>
-            ) : summary.prioritas.map((row) => (
-              <tr key={row.id}>
-                <td><b>{row.rank}</b></td>
-                <td><span className="kode-badge">{row.code}</span></td>
-                <td>{row.nama}</td>
-                <td>{formatNumber(row.preference)}</td>
-                <td><Badge>{row.status}</Badge></td>
-              </tr>
-            ))}
+            {prioritas.length === 0 ? (
+              <tr><td colSpan={6} className="py-10 text-center">Belum ada data. Silakan hitung di Penilaian.</td></tr>
+            ) : (
+              prioritas.slice(0, 5).map((row, index) => (
+                <tr key={row.id}>
+                  <td>{index + 1}</td>
+                  <td>{row.code}</td>
+                  <td>{row.nama}</td>
+                  <td>{formatNumber(row.nilai_saw)}</td>
+                  <td>{formatNumber(row.nilai_wp)}</td>
+                  <td>{formatNumber(row.nilai_topsis)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

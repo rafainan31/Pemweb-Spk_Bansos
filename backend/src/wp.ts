@@ -1,179 +1,53 @@
 import { Criteria, WargaDTO } from "./types";
 
+export function calculateWP(wargaList: WargaDTO[], criteria: Criteria[]) {
+  // Disinkronkan dengan TOPSIS menggunakan pengecekan struktur objek scores
+  const data = wargaList.filter(item => item.scores && Object.keys(item.scores).length > 0);
 
-
-export function calculateWP(
-  wargaList: WargaDTO[],
-  criteria: Criteria[]
-){
-
-
-  const data = wargaList.filter(
-    item => item.status === "Sudah Dinilai"
-  );
-
-
-  if(data.length === 0){
+  if (data.length === 0) {
     return [];
   }
 
+  const totalBobot = criteria.reduce((sum, c) => sum + Number(c.weight), 0);
+  const bobotNormal: any = {};
 
-
-  // total bobot
-
-  const totalBobot =
-    criteria.reduce(
-      (sum,c)=>
-      sum + Number(c.weight),
-      0
-    );
-
-
-
-
-  // normalisasi bobot + cost negatif
-
-  const bobotNormal:any = {};
-
-
-
-  criteria.forEach(c=>{
-
-
-    let weight =
-    Number(c.weight)
-    /
-    totalBobot;
-
-
-
-    if(c.type === "cost"){
-
-      weight =
-      weight * -1;
-
+  criteria.forEach(c => {
+    let weight = Number(c.weight) / totalBobot;
+    if (c.type === "cost") {
+      weight = weight * -1;
     }
-
-
-    bobotNormal[c.code]=weight;
-
-
+    bobotNormal[c.code] = weight;
   });
 
-
-
-
-
-
-
-  // hitung S
-
-  const nilaiS = data.map(warga=>{
-
-
+  const nilaiS = data.map(warga => {
     let S = 1;
-
-
-
-    criteria.forEach(c=>{
-
-
-      const nilai =
-      Number(
-        warga.scores[c.code] || 1
-      );
-
-
-
-      S *= Math.pow(
-        nilai,
-        bobotNormal[c.code]
-      );
-
-
+    criteria.forEach(c => {
+      const nilai = Number(warga.scores[c.code] || 1);
+      S *= Math.pow(nilai, bobotNormal[c.code]);
     });
 
-
-
-
     return {
-
-      id:warga.id,
-
-      code:warga.code,
-
-      nama:warga.nama,
-
+      id: warga.id,
+      code: warga.code,
+      nama: warga.nama,
       S
-
     };
-
-
   });
 
-
-
-
-
-  const totalS =
-    nilaiS.reduce(
-      (sum,item)=>
-      sum + item.S,
-      0
-    );
-
-
-
-
-
-
-  // hitung nilai V
-
+  const totalS = nilaiS.reduce((sum, item) => sum + item.S, 0);
 
   return nilaiS
-
-
-  .map(item=>{
-
-
-    return {
-
-      id:item.id,
-
-      code:item.code,
-
-      nama:item.nama,
-
-
-      nilaiWP:
-      Number(
-        (item.S / totalS)
-        .toFixed(4)
-      )
-
-
-    };
-
-
-  })
-
-
-
-  .sort(
-    (a,b)=>
-    b.nilaiWP-a.nilaiWP
-  )
-
-
-
-  .map(
-    (item,index)=>({
-
-      ...item,
-
-      ranking:index+1
-
+    .map(item => {
+      return {
+        id: item.id,
+        code: item.code,
+        nama: item.nama,
+        nilaiWP: Number((item.S / (totalS || 1)).toFixed(6))
+      };
     })
-  );
-
+    .sort((a, b) => b.nilaiWP - a.nilaiWP)
+    .map((item, index) => ({
+      ...item,
+      ranking: index + 1
+    }));
 }

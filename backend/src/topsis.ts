@@ -1,12 +1,5 @@
 import { Criteria, TopsisResult, WargaDTO } from "./types";
 
-export function getEligibilityStatus(value: number): string {
-  if (value >= 0.75) return "Sangat Layak";
-  if (value >= 0.55) return "Layak";
-  if (value >= 0.4) return "Dipertimbangkan";
-  return "Tidak Layak";
-}
-
 function sortCriteria(criteria: Criteria[]) {
   return [...criteria].sort((a, b) => {
     const aNum = Number(a.code.replace(/\D/g, ""));
@@ -26,11 +19,9 @@ function round(value: number, digits = 8): number {
 
 function roundRecord(record: Record<string, number>) {
   const result: Record<string, number> = {};
-
   Object.keys(record).forEach((key) => {
     result[key] = round(record[key]);
   });
-
   return result;
 }
 
@@ -47,7 +38,6 @@ export function calculateTOPSIS(
 
   const assessed = wargaList.filter((item) => {
     if (!item.scores) return false;
-
     return codes.every((code) => {
       const value = toNumber(item.scores[code]);
       return value > 0;
@@ -84,15 +74,10 @@ export function calculateTOPSIS(
 
   const decisionMatrix: MatrixRow[] = assessed.map((row) => {
     const values: Record<string, number> = {};
-
     codes.forEach((code) => {
       values[code] = toNumber(row.scores[code]);
     });
-
-    return {
-      ...row,
-      values,
-    };
+    return { ...row, values };
   });
 
   const divisor: Record<string, number> = {};
@@ -101,50 +86,39 @@ export function calculateTOPSIS(
     const totalPow = decisionMatrix.reduce((sum, row) => {
       return sum + Math.pow(toNumber(row.values[code]), 2);
     }, 0);
-
     divisor[code] = Math.sqrt(totalPow) || 1;
   });
 
   const normalizedRaw: MatrixRow[] = decisionMatrix.map((row) => {
     const values: Record<string, number> = {};
-
     codes.forEach((code) => {
       values[code] = toNumber(row.values[code]) / divisor[code];
     });
-
-    return {
-      ...row,
-      values,
-    };
+    return { ...row, values };
   });
 
   const weightedRaw: MatrixRow[] = normalizedRaw.map((row) => {
     const values: Record<string, number> = {};
-
     criteria.forEach((criterion) => {
       const code = criterion.code;
       values[code] =
         toNumber(row.values[code]) * toNumber(normalizedWeights[code]);
     });
-
-    return {
-      ...row,
-      values,
-    };
+    return { ...row, values };
   });
 
   const idealPositiveRaw: Record<string, number> = {};
   const idealNegativeRaw: Record<string, number> = {};
 
+  //  KODE PERBAIKAN UNTUK TOPSIS.TS (Dinamis Sesuai Database)
   criteria.forEach((criterion) => {
     const code = criterion.code;
-    const type = String(criterion.type).toLowerCase();
+    const type = String(criterion.type).toLowerCase().trim(); // Bersihkan spasi / case
     const values = weightedRaw.map((row) => row.values[code]);
 
-    // MODIFIKASI DI SINI: Paksa C1, C2, dan C5 ikut logika Benefit 
-    // karena skor data mentahnya sudah dibalik (Skor 5 = Paling Berhak)
-    if (type === "benefit" || code === "C1" || code === "C2" || code === "C5") {
-      idealPositiveRaw[code] = Math.max(...values); // Solusi Ideal Positif mencari nilai terbesar (Skor 5)
+    // Hapus semua hardcode C1, C2, C5, biarkan mengalir dinamis dari database
+    if (type === "benefit") {
+      idealPositiveRaw[code] = Math.max(...values);
       idealNegativeRaw[code] = Math.min(...values);
     } else {
       idealPositiveRaw[code] = Math.min(...values);
@@ -165,11 +139,7 @@ export function calculateTOPSIS(
       }, 0)
     );
 
-    return {
-      ...row,
-      dPlus,
-      dMinus,
-    };
+    return { ...row, dPlus, dMinus };
   });
 
   const results: TopsisResult[] = distancesRaw
@@ -184,7 +154,6 @@ export function calculateTOPSIS(
         nik: row.nik,
         alamat: row.alamat,
         preference: round(preference),
-        status: getEligibilityStatus(preference),
         dPlus: round(row.dPlus),
         dMinus: round(row.dMinus),
         scores: row.scores,
@@ -199,37 +168,29 @@ export function calculateTOPSIS(
 
   return {
     assessed,
-
     weightSum: round(weightSum),
     normalizedWeights: roundRecord(normalizedWeights),
-
     decisionMatrix: decisionMatrix.map((row) => ({
       ...row,
       values: roundRecord(row.values),
     })),
-
     divisor: roundRecord(divisor),
-
     normalized: normalizedRaw.map((row) => ({
       ...row,
       values: roundRecord(row.values),
     })),
-
     weighted: weightedRaw.map((row) => ({
       ...row,
       values: roundRecord(row.values),
     })),
-
     idealPositive: roundRecord(idealPositiveRaw),
     idealNegative: roundRecord(idealNegativeRaw),
-
     distances: distancesRaw.map((row) => ({
       ...row,
       dPlus: round(row.dPlus),
       dMinus: round(row.dMinus),
       values: roundRecord(row.values),
     })),
-
     results,
   };
 }
