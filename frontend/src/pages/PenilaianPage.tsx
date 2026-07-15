@@ -180,13 +180,17 @@ export default function PenilaianPage() {
       setSaving(true);
 
       // 1. Ambil session petugas aktif dari localStorage
-      const userSession = localStorage.getItem("user_session");
+      // KODE BARU (Lebih aman untuk mendeteksi berbagai kemungkinan nama key)
       let loggedInUserId: number | undefined = undefined;
 
-      if (userSession) {
+      // Coba cek beberapa kemungkinan key localStorage yang sering dipakai kelompokmu
+      const sessionRaw = localStorage.getItem("user_session") || localStorage.getItem("user") || localStorage.getItem("userData");
+
+      if (sessionRaw) {
         try {
-          const parsedUser = JSON.parse(userSession);
-          loggedInUserId = parsedUser.id || parsedUser.user?.id;
+          const parsed = JSON.parse(sessionRaw);
+          // Ekstrak ID berdasarkan struktur object data yang ada
+          loggedInUserId = parsed.id || parsed.user?.id || parsed.userData?.id;
         } catch (e) {
           console.error("Gagal membaca session user:", e);
         }

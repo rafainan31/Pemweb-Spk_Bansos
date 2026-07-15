@@ -9,10 +9,10 @@ export default function KriteriaPage() {
   const [message, setMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-async function loadData() {
+  async function loadData() {
     try {
       const response = await api.getCriteria();
-      
+
       // Saringan Sakti: Memaksa data dari backend dibaca sebagai array murni
       if (response && (response as any).data) {
         setCriteria((response as any).data);
@@ -37,13 +37,16 @@ async function loadData() {
     try {
       // Menjalankan pembaruan ke API backend secara paralel untuk semua kriteria C1-C6
       await Promise.all(
-        criteria.map((item) =>
-          api.updateCriteria(item.id, { weight: item.weight, type: item.type })
-        )
+        criteria.map((item) => {
+          // Kita bikin format huruf besar (Benefit/Cost) buat jaga-jaga kalau DB butuh kapital
+          const formattedType = item.type.charAt(0).toUpperCase() + item.type.slice(1).toLowerCase();
+
+          // Panggil fungsi dengan 3 argumen sesuai api.ts
+          return api.updateCriterion(item.id, item.weight, formattedType);
+        })
       );
-      
+
       setMessage('Semua konfigurasi bobot kriteria berhasil disimpan ke MariaDB.');
-      // Refresh data dari database untuk memastikan sinkronisasi total
       await loadData();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan semua kriteria');
@@ -61,10 +64,10 @@ async function loadData() {
           <button className="btn light" onClick={loadData} disabled={isSaving}>
             Refresh Kriteria
           </button>
-          
+
           {/* TOMBOL BARU: Simpan Semua Sekaligus */}
-          <button 
-            className="btn primary flex items-center gap-2 shadow-md" 
+          <button
+            className="btn primary flex items-center gap-2 shadow-md"
             onClick={handleSaveAll}
             disabled={isSaving}
             style={{ backgroundColor: '#1d66f5', color: '#fff', fontWeight: 'bold' }}

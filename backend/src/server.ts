@@ -24,7 +24,7 @@ interface PenilaianInput {
   jenisLantai: string;
   kepemilikanKendaraan: string;
   komponenPkh: string;
-  userId?: number; 
+  userId?: number;
 }
 
 interface WargaItem {
@@ -115,7 +115,7 @@ async function ensureDefaultRequest() {
   const defaultWargaId = wargaList[0].id;
 
   const [result] = await pool.query(
-    `INSERT INTO rekomendasi_request (warga_id, status) VALUES (?, 'Proses')`, 
+    `INSERT INTO rekomendasi_request (warga_id, status) VALUES (?, 'Proses')`,
     [defaultWargaId]
   );
 
@@ -262,14 +262,21 @@ app.put("/api/criteria/:id", async (req, res) => {
       return;
     }
 
-    const requestId = await ensureDefaultRequest();
-    await pool.query("UPDATE kriteria SET weight = ?, type = ? WHERE id = ?", [Number(weight), type, id]);
-    await pool.query(
-      `INSERT INTO rekomendasi_req_weight (rekomendasi_request_id, kriteria_id, bobot)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE bobot = VALUES(bobot)`,
-      [requestId, id, Number(weight)]
-    );
+    // 1. Update tabel kriteria utama (Ini yang paling penting buat halaman Kriteria)
+    await pool.query("UPDATE kriteria SET weight = ?, type = ? WHERE id = ?", [Number(weight), type.toLowerCase(), id]);
+
+    // 2. Pembungkus Aman: Biar kalau tabel rekomendasi bermasalah, server gak crash 500
+    try {
+      const requestId = await ensureDefaultRequest();
+      await pool.query(
+        `INSERT INTO rekomendasi_req_weight (rekomendasi_request_id, kriteria_id, bobot)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE bobot = VALUES(bobot)`,
+        [requestId, id, Number(weight)]
+      );
+    } catch (innerError) {
+      console.log("Log rekomendasi req weight dilewati/error:", innerError);
+    }
 
     const rows = await getCriteria();
     res.json({ message: "Kriteria berhasil diperbarui", data: rows });
@@ -383,7 +390,7 @@ app.get("/api/topsis", async (_req, res) => {
     const saw = calculateSAW(wargaDTO, criteria);
     const wp = calculateWP(wargaDTO, criteria);
 
-    try { await saveTerpaduMultiMetode(topsis.results, saw, wp); } catch (e) {}
+    try { await saveTerpaduMultiMetode(topsis.results, saw, wp); } catch (e) { }
 
     const mergedResults = topsis.results.map((tItem: any) => {
       const sMatch = saw.find((s: any) => s.id === tItem.id);
@@ -458,7 +465,7 @@ app.delete("/api/warga/:id", async (req, res) => {
 // =========================================================
 app.post("/api/warga", async (req, res) => {
   const body = req.body as PenilaianInput;
-  
+
   const validationError = validatePenilaianInput(body);
   if (validationError) {
     res.status(400).json({ message: validationError });
@@ -472,7 +479,7 @@ app.post("/api/warga", async (req, res) => {
   try {
     await connection.beginTransaction();
     const cleanNik = String(body.nik).replace(/\s/g, "");
-    
+
     const [existingRows] = await connection.query("SELECT id FROM warga WHERE nik = ? LIMIT 1", [cleanNik]);
     const existing = (existingRows as { id: number }[])[0];
 
@@ -488,14 +495,14 @@ app.post("/api/warga", async (req, res) => {
 
     for (const [field, code] of Object.entries(FIELD_MAP)) {
       const selectedLabel = body[field as keyof typeof FIELD_MAP];
-      
+
       const [valueRows] = await connection.query(
         `SELECT k.id AS kriteria_id, kv.id AS kriteria_value_id, kv.skor
          FROM kriteria k 
          JOIN kriteria_value kv ON kv.kriteria_id = k.id
          WHERE k.kode = ? AND kv.value_label = ? LIMIT 1`, [code, selectedLabel]
       );
-      
+
       const selected = (valueRows as any[])[0];
       if (selected) {
         // PERBAIKAN TOTAL: Memaksa UPDATE user_id = VALUES(user_id) secara independen tanpa memedulikan status skor duplikat
@@ -505,7 +512,7 @@ app.post("/api/warga", async (req, res) => {
            ON DUPLICATE KEY UPDATE 
              kriteria_value_id = VALUES(kriteria_value_id), 
              skor = VALUES(skor),
-             user_id = ${petugasId ? Number(petugasId) : 'NULL'}`, 
+             user_id = ${petugasId ? Number(petugasId) : 'NULL'}`,
           [wargaId, selected.kriteria_id, selected.kriteria_value_id, petugasId, selected.skor]
         );
       }
