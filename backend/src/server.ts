@@ -130,7 +130,8 @@ async function getCriteria(): Promise<Criteria[]> {
     id: Number(item.id),
     code: item.code,
     name: item.name,
-    type: item.type,
+    // PERBAIKAN UTAMA: Dipaksa huruf kecil dan tanpa spasi agar match dengan rumus matematika SPK
+    type: String(item.type).toLowerCase().trim() as "cost" | "benefit", 
     weight: Number(item.weight),
   }));
 }

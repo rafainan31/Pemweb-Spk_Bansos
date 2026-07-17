@@ -1,7 +1,6 @@
 import { Criteria, WargaDTO } from "./types";
 
 export function calculateWP(wargaList: WargaDTO[], criteria: Criteria[]) {
-  // Disinkronkan dengan TOPSIS menggunakan pengecekan struktur objek scores
   const data = wargaList.filter(item => item.scores && Object.keys(item.scores).length > 0);
 
   if (data.length === 0) {
@@ -38,11 +37,13 @@ export function calculateWP(wargaList: WargaDTO[], criteria: Criteria[]) {
 
   return nilaiS
     .map(item => {
+      const finalWP = item.S / (totalS || 1);
+
       return {
         id: item.id,
         code: item.code,
         nama: item.nama,
-        nilaiWP: Number((item.S / (totalS || 1)).toFixed(6))
+        nilaiWP: Number(finalWP.toFixed(4))
       };
     })
     .sort((a, b) => b.nilaiWP - a.nilaiWP)

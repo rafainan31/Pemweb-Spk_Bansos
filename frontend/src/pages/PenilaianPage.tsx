@@ -102,6 +102,40 @@ export default function PenilaianPage() {
     try {
       setLoadingOptions(true);
       const data = await api.getOptions();
+
+      // Membalikkan skor khusus untuk kriteria bermasalah bertipe COST
+      // Supaya logikanya lurus: Nilai terkecil (misal pendapatan <= 500rb) mendapatkan SKOR 1
+      const keysToReverse: OptionKey[] = ["pendapatanBulanan", "dayaListrik", "kepemilikanKendaraan"];
+      
+      keysToReverse.forEach((key) => {
+        if (data[key] && Array.isArray(data[key])) {
+          // Salin data opsi agar tidak merubah data asli directly
+          const sortedOptions = [...data[key]];
+          
+          // Dapatkan daftar skor unik yang tersedia secara berurutan (misal [1, 2, 3, 4, 5])
+          const availableScores = sortedOptions
+            .map(item => Number(item.score ?? item.value ?? 0))
+            .sort((a, b) => a - b);
+            
+          const maxIndex = availableScores.length - 1;
+
+          // Balikkan skornya secara dinamis
+          data[key] = sortedOptions.map(item => {
+            const currentScore = Number(item.score ?? item.value ?? 0);
+            const originalIndex = availableScores.indexOf(currentScore);
+            
+            // Jika skor lama adalah 5 (index 4), skor baru menjadi index (4 - 4) = index 0 yaitu 1
+            const newScore = originalIndex !== -1 ? availableScores[maxIndex - originalIndex] : currentScore;
+
+            return {
+              ...item,
+              score: newScore,
+              value: newScore // antisipasi jika backend menggunakan property value
+            };
+          });
+        }
+      });
+
       setOptionsData({
         ...emptyOptions,
         ...data,

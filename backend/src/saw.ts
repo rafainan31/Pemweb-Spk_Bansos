@@ -1,7 +1,6 @@
 import { Criteria, WargaDTO } from "./types";
 
 export function calculateSAW(wargaList: WargaDTO[], criteria: Criteria[]) {
-  // Disinkronkan dengan TOPSIS menggunakan pengecekan struktur objek scores
   const data = wargaList.filter(item => item.scores && Object.keys(item.scores).length > 0);
 
   if (data.length === 0) {
@@ -35,14 +34,11 @@ export function calculateSAW(wargaList: WargaDTO[], criteria: Criteria[]) {
       id: warga.id,
       code: warga.code,
       nama: warga.nama,
-      nilaiSAW: Number(nilaiAkhir.toFixed(6))
+      nilaiSAW: Number(nilaiAkhir.toFixed(4))
     };
   });
 
   return result
     .sort((a, b) => b.nilaiSAW - a.nilaiSAW)
-    .map((item, index) => ({
-      ...item,
-      ranking: index + 1
-    }));
+    .map((item, index) => ({ ...item, ranking: index + 1 }));
 }
